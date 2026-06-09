@@ -266,6 +266,148 @@ describe('Event Adjudicator Service', () => {
       configuration.SUPPRESS_ALERTS = false;
     });
 
+    it('ALERTS_ONLY=true: should forward when status is ALRT', async () => {
+      const expectedReq = getMockTransaction();
+      const ruleResults: RuleResult[] = [{ id: '', cfg: '', subRuleRef: '', reason: '', tenantId: '', indpdntVarbl: 0 }];
+
+      configuration.SUPPRESS_ALERTS = false;
+      configuration.ALERTS_ONLY = true;
+
+      const networkMap = getMockNetworkMap();
+      const typologyResult: TypologyResult = {
+        result: 50,
+        id: '028@1.0',
+        cfg: '1.0',
+        review: true,
+        workflow: { alertThreshold: 100, interdictionThreshold: 0 },
+        ruleResults,
+        tenantId: 'test-tenant',
+      };
+
+      const typologySpy = jest.spyOn(helpers, 'handleTypologies').mockImplementationOnce(() => {
+        return Promise.resolve({
+          review: true,
+          typologyResult: [
+            {
+              id: '028@1.0',
+              cfg: '1.0',
+              result: 50,
+              review: true,
+              workflow: { alertThreshold: 0 },
+              prcgTm: 0,
+              tenantId: 'test-tenant',
+              ruleResults: [],
+            },
+          ],
+        });
+      });
+
+      const responseSpy = jest.spyOn(server, 'handleResponse').mockImplementation((_response: unknown, _subject?: string[] | undefined) => {
+        return Promise.resolve();
+      });
+
+      await handleExecute({ transaction: expectedReq, networkMap: networkMap, typologyResult: typologyResult });
+
+      expect(typologySpy).toHaveBeenCalledTimes(1);
+      expect(responseSpy).toHaveBeenCalledTimes(1);
+
+      configuration.ALERTS_ONLY = false;
+    });
+
+    it('ALERTS_ONLY=true: should suppress when status is NALT', async () => {
+      const expectedReq = getMockTransaction();
+      const ruleResults: RuleResult[] = [{ id: '', cfg: '', subRuleRef: '', reason: '', tenantId: '', indpdntVarbl: 0 }];
+
+      configuration.SUPPRESS_ALERTS = false;
+      configuration.ALERTS_ONLY = true;
+
+      const networkMap = getMockNetworkMap();
+      const typologyResult: TypologyResult = {
+        result: 50,
+        id: '028@1.0',
+        cfg: '1.0',
+        review: false,
+        workflow: { alertThreshold: 0, interdictionThreshold: 0 },
+        ruleResults,
+        tenantId: 'test-tenant',
+      };
+
+      const typologySpy = jest.spyOn(helpers, 'handleTypologies').mockImplementationOnce(() => {
+        return Promise.resolve({
+          review: false,
+          typologyResult: [
+            {
+              id: '028@1.0',
+              cfg: '1.0',
+              result: 50,
+              review: false,
+              workflow: { alertThreshold: 0 },
+              prcgTm: 0,
+              tenantId: 'test-tenant',
+              ruleResults: [],
+            },
+          ],
+        });
+      });
+
+      const responseSpy = jest.spyOn(server, 'handleResponse').mockImplementation((_response: unknown, _subject?: string[] | undefined) => {
+        return Promise.resolve();
+      });
+
+      await handleExecute({ transaction: expectedReq, networkMap: networkMap, typologyResult: typologyResult });
+
+      expect(typologySpy).toHaveBeenCalledTimes(1);
+      expect(responseSpy).toHaveBeenCalledTimes(0); // NALT filtered out
+
+      configuration.ALERTS_ONLY = false;
+    });
+
+    it('ALERTS_ONLY=false: should forward NALT results', async () => {
+      const expectedReq = getMockTransaction();
+      const ruleResults: RuleResult[] = [{ id: '', cfg: '', subRuleRef: '', reason: '', tenantId: '', indpdntVarbl: 0 }];
+
+      configuration.SUPPRESS_ALERTS = false;
+      configuration.ALERTS_ONLY = false;
+
+      const networkMap = getMockNetworkMap();
+      const typologyResult: TypologyResult = {
+        result: 50,
+        id: '028@1.0',
+        cfg: '1.0',
+        review: false,
+        workflow: { alertThreshold: 0, interdictionThreshold: 0 },
+        ruleResults,
+        tenantId: 'test-tenant',
+      };
+
+      const typologySpy = jest.spyOn(helpers, 'handleTypologies').mockImplementationOnce(() => {
+        return Promise.resolve({
+          review: false,
+          typologyResult: [
+            {
+              id: '028@1.0',
+              cfg: '1.0',
+              result: 50,
+              review: false,
+              workflow: { alertThreshold: 0 },
+              prcgTm: 0,
+              tenantId: 'test-tenant',
+              ruleResults: [],
+            },
+          ],
+        });
+      });
+
+      const responseSpy = jest.spyOn(server, 'handleResponse').mockImplementation((_response: unknown, _subject?: string[] | undefined) => {
+        return Promise.resolve();
+      });
+
+      await handleExecute({ transaction: expectedReq, networkMap: networkMap, typologyResult: typologyResult });
+
+      expect(typologySpy).toHaveBeenCalledTimes(1);
+      expect(responseSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('should handle a unsuccessful transaction, catch error.', async () => {
       const expectedReq = getMockTransaction();
       const ruleResults: RuleResult[] = [{ id: '', cfg: '', subRuleRef: '', reason: '', tenantId: '', indpdntVarbl: 0 }];

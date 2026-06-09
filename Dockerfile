@@ -77,6 +77,7 @@ ENV EVALUATION_DATABASE_CERT_PATH=/usr/local/share/ca-certificates/ca-certificat
 
 # Alert
 ENV SUPPRESS_ALERTS=false
+ENV ALERTS_ONLY=false
 
 # Apm
 ENV APM_ACTIVE=true
