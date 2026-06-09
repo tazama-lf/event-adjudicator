@@ -34,6 +34,7 @@ A [registry](https://github.com/tazama-lf/docs/blob/f292c9ddabf52d6fe62addc1c619
 | Name                                   | Purpose                                     | Example                   |
 |----------------------------------------|---------------------------------------------|---------------------------|
 | `SUPPRESS_ALERTS`                      | Suppress forwarding report to NATS producer | `false`                   |
+| `ALERTS_ONLY`                          | When `true`, only forward reports with `status === 'ALRT'` to the NATS producer; when `false` (default) or unset, forward all completed evaluation results. Has no effect when `SUPPRESS_ALERTS=true`. | `false`                   |
 | `RAW_HISTORY_DATABASE`                 | PostgreSQL database name                    | `raw_history`             |
 | `RAW_HISTORY_DATABASE_HOST`            | PostgreSQL hostname or endpoint             | `localhost`               |
 | `RAW_HISTORY_DATABASE_PORT`            | PostgreSQL post used                        | `5432`                    |

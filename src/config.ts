@@ -13,12 +13,18 @@ dotenv.config({
 export interface ExtendedConfig {
   ALERT_PRODUCER: string;
   SUPPRESS_ALERTS: boolean;
+  ALERTS_ONLY: boolean;
   ALERT_DESTINATION: 'global' | 'tenant';
 }
 
 export const additionalEnvironmentVariables: AdditionalConfig[] = [
   {
     name: 'SUPPRESS_ALERTS',
+    type: 'boolean',
+    optional: false,
+  },
+  {
+    name: 'ALERTS_ONLY',
     type: 'boolean',
     optional: false,
   },

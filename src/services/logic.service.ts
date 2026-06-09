@@ -77,7 +77,7 @@ export const handleExecute = async (req: unknown): Promise<void> => {
       const spanInsertTransaction = apm.startSpan('db.insert.transaction');
       await databaseManager.saveEvaluationResult(transactionID, transaction, networkMap, alert, dataCache);
       spanInsertTransaction?.end();
-      if (!configuration.SUPPRESS_ALERTS) {
+      if (!configuration.SUPPRESS_ALERTS && (!configuration.ALERTS_ONLY || alert.status === 'ALRT')) {
         const result: CMSRequest = {
           message: `Successfully completed ${typologyCount} typologies`,
           report: alert,
@@ -94,7 +94,7 @@ export const handleExecute = async (req: unknown): Promise<void> => {
     }
     apmTransaction?.end();
   } catch (e) {
-    loggerService.error('Error while calculating Transaction score', e as Error, functionName);
+    loggerService.error('Error while calculating Transaction score', e, functionName);
   } finally {
     apmTransaction?.end();
   }
