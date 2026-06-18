@@ -7,6 +7,11 @@ process.env.ALERTS_ONLY = 'false';
 process.env.ALERT_PRODUCER = 'stream';
 process.env.ALERT_DESTINATION = 'global';
 
+process.env.SERVICE_CHANNEL_CONSUMER = 'service-channel';
+process.env.SERVICE_CHANNEL_PRODUCER = 'service-channel-ack';
+process.env.SERVICE_CHANNEL_SOURCE_URI_PREFIX = '';
+process.env.SERVICE_CHANNEL_CLASS = 'event-adjudicator';
+
 process.env.APM_ACTIVE = 'false';
 process.env.APM_SERVICE_NAME = 'test';
 process.env.APM_URL = 'test';

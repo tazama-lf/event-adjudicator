@@ -35,6 +35,10 @@ A [registry](https://github.com/tazama-lf/docs/blob/f292c9ddabf52d6fe62addc1c619
 |----------------------------------------|---------------------------------------------|---------------------------|
 | `SUPPRESS_ALERTS`                      | Suppress forwarding report to NATS producer | `false`                   |
 | `ALERTS_ONLY`                          | When `true`, only forward reports with `status === 'ALRT'` to the NATS producer; when `false` (default), forward all completed evaluation results. Required - startup will fail if unset. Has no effect when `SUPPRESS_ALERTS=true`. | `false`                   |
+| `SERVICE_CHANNEL_CONSUMER`             | Forward subject subscribed to for service-channel events      | `service-channel`         |
+| `SERVICE_CHANNEL_PRODUCER`             | Reply subject acknowledgements are published to               | `service-channel-ack`     |
+| `SERVICE_CHANNEL_SOURCE_URI_PREFIX`    | Optional prefix for CloudEvents source composition            | `urn:tazama:`             |
+| `SERVICE_CHANNEL_CLASS`                | Required service-channel audience class for this service      | `event-adjudicator`       |
 | `RAW_HISTORY_DATABASE`                 | PostgreSQL database name                    | `raw_history`             |
 | `RAW_HISTORY_DATABASE_HOST`            | PostgreSQL hostname or endpoint             | `localhost`               |
 | `RAW_HISTORY_DATABASE_PORT`            | PostgreSQL post used                        | `5432`                    |
@@ -122,3 +126,16 @@ The output is the input with an added [tadpResult](https://github.com/tazama-lf/
   tadpResult: TADPResult;
 }
 ```
+
+## Service-channel receive seam
+At startup, event-adjudicator subscribes to the service-channel forward subject (`SERVICE_CHANNEL_CONSUMER`, default `service-channel`) and processes each received message through a validate, dispatch, re-subscribe pipeline.
+Incoming structured-mode CloudEvent bytes are decoded and the envelope is re-validated; a malformed message is dropped at `warn` without tearing down the subscription.
+The handler dispatches on the CloudEvent `type` verb (currently only `org.tazama.network-map.activated`); an unrecognised type is dropped at `warn`.
+An audience gate then applies: a message acts only when its `audience` is absent, `all`, this service's class (`event-adjudicator`), or its own function name, otherwise it is ignored at `debug`.
+For a valid, in-audience `network-map.activated` event, the full per-processor data-plane subject set is re-derived from the reloaded network map - keyed on `FUNCTION_NAME` and spanning every tenant - and handed to the additive seam, which subscribes only the new subjects and leaves existing subscriptions in place (the make-before-break half of a hot reload).
+Derivation is by processor, never by tenant: the trigger's `tenantId` is irrelevant here, so a different tenant (or none at all) yields the identical subject set and re-delivery is a safe idempotent no-op.
+Tearing down stale subscriptions is deliberately out of scope for this seam.
+After the matched handler runs, exactly one acknowledgement is published on the reply subject (`SERVICE_CHANNEL_PRODUCER`, default `service-channel-ack`): a CloudEvent reusing the trigger's `type` verb, with `source` composed as `${SERVICE_CHANNEL_SOURCE_URI_PREFIX}${FUNCTION_NAME}`, a fresh `id`, and `data` carrying the triggering event's `id` as `correlationId`, an `outcome` of `success` or `error`, and (on failure) the error message.
+The `source` composition assumes the service-channel audience class (`SERVICE_CHANNEL_CLASS`) is deployed to match `FUNCTION_NAME` (`event-adjudicator`); `validateServiceChannelConfiguration` fails startup fast if `SERVICE_CHANNEL_CLASS` is anything other than `event-adjudicator`.
+The handler returning normally yields an `outcome: success` ack and a throw yields an `outcome: error` ack, so each handled message produces exactly one ack publish attempt; a failed publish is logged and never tears down the subscription.
+This service runs one worker per CPU and each worker owns its own NATS connection, so a network-map reload produces one ack per worker; de-duplicating those acks is the responsibility of the publishing side, not this seam.

@@ -62,6 +62,9 @@ typings/
 # dotenv environment variables file
 *.env
 
+# Keys and certificates
+*.pem
+
 # next.js build output
 .next
 Katalon Tests/Profiles/
