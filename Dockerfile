@@ -79,6 +79,12 @@ ENV EVALUATION_DATABASE_CERT_PATH=/usr/local/share/ca-certificates/ca-certificat
 ENV SUPPRESS_ALERTS=false
 ENV ALERTS_ONLY=false
 
+# Service Channel
+ENV SERVICE_CHANNEL_CONSUMER=service-channel
+ENV SERVICE_CHANNEL_PRODUCER=service-channel-ack
+ENV SERVICE_CHANNEL_SOURCE_URI_PREFIX=
+ENV SERVICE_CHANNEL_CLASS=event-adjudicator
+
 # Apm
 ENV APM_ACTIVE=true
 ENV APM_URL=http://apm-server.development.svc.cluster.local:8200/
