@@ -2,6 +2,7 @@
 import apm from '../apm';
 
 import { CalculateDuration } from '@tazama-lf/frms-coe-lib/lib/helpers/calculatePrcg';
+import { isBaseMessageTransaction, isPacs002Transaction, isStructuredTransaction } from '@tazama-lf/frms-coe-lib';
 import type { DataCache } from '@tazama-lf/frms-coe-lib/lib/interfaces';
 import type { Alert } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/Alert';
 import type { CMSRequest } from '@tazama-lf/frms-coe-lib/lib/interfaces/processor-files/CMSRequest';
@@ -22,8 +23,20 @@ export const handleExecute = async (req: unknown): Promise<void> => {
     const { metaData } = parsedReq;
     const { transaction, networkMap, typologyResult } = parsedReq;
     const [networkMapMessage] = networkMap.messages;
-    const transactionType = 'FIToFIPmtSts';
-    const transactionID = transaction[transactionType].GrpHdr.MsgId;
+    let transactionID: string;
+    if (isStructuredTransaction(transaction)) {
+      if (isPacs002Transaction(transaction)) {
+        transactionID = transaction.FIToFIPmtSts.GrpHdr.MsgId;
+      } else {
+        loggerService.error('Unsupported structured transaction type', new Error('Unsupported structured transaction type'), functionName);
+        return;
+      }
+    } else if (isBaseMessageTransaction(transaction)) {
+      transactionID = transaction.MsgId;
+    } else {
+      loggerService.error('Unsupported transaction type', new Error('Unsupported transaction type'), functionName);
+      return;
+    }
     const dataCache = parsedReq.DataCache;
     const tenantId = parsedReq.transaction.TenantId;
 
@@ -64,7 +77,7 @@ export const handleExecute = async (req: unknown): Promise<void> => {
       const spanInsertTransaction = apm.startSpan('db.insert.transaction');
       await databaseManager.saveEvaluationResult(transactionID, transaction, networkMap, alert, dataCache);
       spanInsertTransaction?.end();
-      if (!configuration.SUPPRESS_ALERTS) {
+      if (!configuration.SUPPRESS_ALERTS && (!configuration.ALERTS_ONLY || alert.status === 'ALRT')) {
         const result: CMSRequest = {
           message: `Successfully completed ${typologyCount} typologies`,
           report: alert,
@@ -81,7 +94,7 @@ export const handleExecute = async (req: unknown): Promise<void> => {
     }
     apmTransaction?.end();
   } catch (e) {
-    loggerService.error('Error while calculating Transaction score', e as Error, functionName);
+    loggerService.error('Error while calculating Transaction score', e, functionName);
   } finally {
     apmTransaction?.end();
   }

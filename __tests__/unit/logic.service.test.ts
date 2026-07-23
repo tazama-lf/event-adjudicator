@@ -29,7 +29,7 @@ jest.mock('@tazama-lf/frms-coe-startup-lib/lib/interfaces/iStartupConfig', () =>
     functionName: 'producer',
   },
 }));
-describe('TADProc Service', () => {
+describe('Event Adjudicator Service', () => {
   beforeAll(async () => {
     await dbInit();
     await runServer();
@@ -266,6 +266,148 @@ describe('TADProc Service', () => {
       configuration.SUPPRESS_ALERTS = false;
     });
 
+    it('ALERTS_ONLY=true: should forward when status is ALRT', async () => {
+      const expectedReq = getMockTransaction();
+      const ruleResults: RuleResult[] = [{ id: '', cfg: '', subRuleRef: '', reason: '', tenantId: '', indpdntVarbl: 0 }];
+
+      configuration.SUPPRESS_ALERTS = false;
+      configuration.ALERTS_ONLY = true;
+
+      const networkMap = getMockNetworkMap();
+      const typologyResult: TypologyResult = {
+        result: 50,
+        id: '028@1.0',
+        cfg: '1.0',
+        review: true,
+        workflow: { alertThreshold: 100, interdictionThreshold: 0 },
+        ruleResults,
+        tenantId: 'test-tenant',
+      };
+
+      const typologySpy = jest.spyOn(helpers, 'handleTypologies').mockImplementationOnce(() => {
+        return Promise.resolve({
+          review: true,
+          typologyResult: [
+            {
+              id: '028@1.0',
+              cfg: '1.0',
+              result: 50,
+              review: true,
+              workflow: { alertThreshold: 0 },
+              prcgTm: 0,
+              tenantId: 'test-tenant',
+              ruleResults: [],
+            },
+          ],
+        });
+      });
+
+      const responseSpy = jest.spyOn(server, 'handleResponse').mockImplementation((_response: unknown, _subject?: string[] | undefined) => {
+        return Promise.resolve();
+      });
+
+      await handleExecute({ transaction: expectedReq, networkMap: networkMap, typologyResult: typologyResult });
+
+      expect(typologySpy).toHaveBeenCalledTimes(1);
+      expect(responseSpy).toHaveBeenCalledTimes(1);
+
+      configuration.ALERTS_ONLY = false;
+    });
+
+    it('ALERTS_ONLY=true: should suppress when status is NALT', async () => {
+      const expectedReq = getMockTransaction();
+      const ruleResults: RuleResult[] = [{ id: '', cfg: '', subRuleRef: '', reason: '', tenantId: '', indpdntVarbl: 0 }];
+
+      configuration.SUPPRESS_ALERTS = false;
+      configuration.ALERTS_ONLY = true;
+
+      const networkMap = getMockNetworkMap();
+      const typologyResult: TypologyResult = {
+        result: 50,
+        id: '028@1.0',
+        cfg: '1.0',
+        review: false,
+        workflow: { alertThreshold: 0, interdictionThreshold: 0 },
+        ruleResults,
+        tenantId: 'test-tenant',
+      };
+
+      const typologySpy = jest.spyOn(helpers, 'handleTypologies').mockImplementationOnce(() => {
+        return Promise.resolve({
+          review: false,
+          typologyResult: [
+            {
+              id: '028@1.0',
+              cfg: '1.0',
+              result: 50,
+              review: false,
+              workflow: { alertThreshold: 0 },
+              prcgTm: 0,
+              tenantId: 'test-tenant',
+              ruleResults: [],
+            },
+          ],
+        });
+      });
+
+      const responseSpy = jest.spyOn(server, 'handleResponse').mockImplementation((_response: unknown, _subject?: string[] | undefined) => {
+        return Promise.resolve();
+      });
+
+      await handleExecute({ transaction: expectedReq, networkMap: networkMap, typologyResult: typologyResult });
+
+      expect(typologySpy).toHaveBeenCalledTimes(1);
+      expect(responseSpy).toHaveBeenCalledTimes(0); // NALT filtered out
+
+      configuration.ALERTS_ONLY = false;
+    });
+
+    it('ALERTS_ONLY=false: should forward NALT results', async () => {
+      const expectedReq = getMockTransaction();
+      const ruleResults: RuleResult[] = [{ id: '', cfg: '', subRuleRef: '', reason: '', tenantId: '', indpdntVarbl: 0 }];
+
+      configuration.SUPPRESS_ALERTS = false;
+      configuration.ALERTS_ONLY = false;
+
+      const networkMap = getMockNetworkMap();
+      const typologyResult: TypologyResult = {
+        result: 50,
+        id: '028@1.0',
+        cfg: '1.0',
+        review: false,
+        workflow: { alertThreshold: 0, interdictionThreshold: 0 },
+        ruleResults,
+        tenantId: 'test-tenant',
+      };
+
+      const typologySpy = jest.spyOn(helpers, 'handleTypologies').mockImplementationOnce(() => {
+        return Promise.resolve({
+          review: false,
+          typologyResult: [
+            {
+              id: '028@1.0',
+              cfg: '1.0',
+              result: 50,
+              review: false,
+              workflow: { alertThreshold: 0 },
+              prcgTm: 0,
+              tenantId: 'test-tenant',
+              ruleResults: [],
+            },
+          ],
+        });
+      });
+
+      const responseSpy = jest.spyOn(server, 'handleResponse').mockImplementation((_response: unknown, _subject?: string[] | undefined) => {
+        return Promise.resolve();
+      });
+
+      await handleExecute({ transaction: expectedReq, networkMap: networkMap, typologyResult: typologyResult });
+
+      expect(typologySpy).toHaveBeenCalledTimes(1);
+      expect(responseSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('should handle a unsuccessful transaction, catch error.', async () => {
       const expectedReq = getMockTransaction();
       const ruleResults: RuleResult[] = [{ id: '', cfg: '', subRuleRef: '', reason: '', tenantId: '', indpdntVarbl: 0 }];
@@ -294,6 +436,45 @@ describe('TADProc Service', () => {
 
       expect(typologySpy).toHaveBeenCalledTimes(1);
       expect(responseSpy).toHaveBeenCalledTimes(0);
+    });
+
+    it('should return early for unsupported structured transaction type', async () => {
+      // Pacs008 passes isStructuredTransaction but not isPacs002Transaction
+      const pacs008 = {
+        TxTp: 'pacs.008.001.10',
+        TenantId: 'test-tenant',
+        FIToFICstmrCdtTrf: { GrpHdr: { MsgId: 'msg-001', CreDtTm: '2021-12-03T15:24:26.000Z' }, CdtTrfTxInf: {} },
+      };
+      const networkMap = getMockNetworkMap();
+      const typologyResult: TypologyResult = {
+        result: 50,
+        id: '028@1.0',
+        cfg: '1.0',
+        workflow: { alertThreshold: 0, interdictionThreshold: 0 },
+        ruleResults: [],
+        tenantId: 'test-tenant',
+      };
+
+      const responseSpy = jest.spyOn(server, 'handleResponse');
+      await handleExecute({ transaction: pacs008, networkMap, typologyResult });
+      expect(responseSpy).not.toHaveBeenCalled();
+    });
+
+    it('should process BaseMessage transaction type', async () => {
+      const baseMessage = { TxTp: 'custom-type', TenantId: 'test-tenant', MsgId: 'msg-001', Payload: { key: 'value' } };
+      const networkMap = getMockNetworkMap();
+      const typologyResult: TypologyResult = {
+        result: 50,
+        id: '028@1.0',
+        cfg: '1.0',
+        workflow: { alertThreshold: 0, interdictionThreshold: 0 },
+        ruleResults: [],
+        tenantId: 'test-tenant',
+      };
+
+      const responseSpy = jest.spyOn(server, 'handleResponse');
+      await handleExecute({ transaction: baseMessage, networkMap, typologyResult });
+      expect(responseSpy).not.toHaveBeenCalled();
     });
   });
 });

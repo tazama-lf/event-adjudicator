@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # SPDX-License-Identifier: Apache-2.0
 
 ARG BUILD_IMAGE=node:20-bullseye
@@ -12,9 +13,8 @@ COPY ./src ./src
 COPY ./package*.json ./
 COPY ./tsconfig.json ./
 COPY .npmrc ./
-ARG GH_TOKEN
 
-RUN npm ci --ignore-scripts
+RUN --mount=type=secret,id=GH_TOKEN,env=GH_TOKEN npm ci --ignore-scripts
 RUN npm run build
 
 FROM ${BUILD_IMAGE} AS dep-resolver
@@ -23,8 +23,7 @@ LABEL stage=pre-prod
 
 COPY package*.json ./
 COPY .npmrc ./
-ARG GH_TOKEN
-RUN npm ci --omit=dev --ignore-scripts
+RUN --mount=type=secret,id=GH_TOKEN,env=GH_TOKEN npm ci --omit=dev --ignore-scripts
 
 FROM ${RUN_IMAGE} AS run-env
 USER nonroot
@@ -45,7 +44,7 @@ ENV write_timeout="15s"
 ENV read_timeout="15s"
 
 # Service-Based Environment Variables
-ENV FUNCTION_NAME=transaction-aggregation-decisioning-processor
+ENV FUNCTION_NAME=event-adjudicator
 ENV NODE_ENV=production
 ENV MAX_CPU=
 
@@ -78,6 +77,13 @@ ENV EVALUATION_DATABASE_CERT_PATH=/usr/local/share/ca-certificates/ca-certificat
 
 # Alert
 ENV SUPPRESS_ALERTS=false
+ENV ALERTS_ONLY=false
+
+# Service Channel
+ENV SERVICE_CHANNEL_CONSUMER=service-channel
+ENV SERVICE_CHANNEL_PRODUCER=service-channel-ack
+ENV SERVICE_CHANNEL_SOURCE_URI_PREFIX=
+ENV SERVICE_CHANNEL_CLASS=event-adjudicator
 
 # Apm
 ENV APM_ACTIVE=true
